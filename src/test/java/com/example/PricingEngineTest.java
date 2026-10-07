@@ -4,19 +4,40 @@ import net.jqwik.api.ForAll;
 import net.jqwik.api.Property;
 import net.jqwik.api.constraints.Positive;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.*;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
 
-@DisplayName("PricingEngine Comprehensive Test Suite")
+// mockito for behaviour verification of the class
+// without mockito only output verification is happening
+// Never mock the class want to test using mockito, only the dependencies.
+// Here junit test is given for the class we are testing which is PricingEngine
+// Mockito is using to test the dependend class like AuditService
+// If you want to mock PricingEngine, then there must another class using PricingEngine
+@ExtendWith(MockitoExtension.class)
+@DisplayName("PricingEngine Comprehensive Test Suite with Mockito")
 class PricingEngineTest {
 
-    private final PricingEngine engine = new PricingEngine();
+    // Fake object 
+    @Mock
+    private AuditService auditService;
+
+    // Automatically injects the mocked AuditService into PricingEngine
+    @InjectMocks
+    private PricingEngine engine;
 
     // -------------------------------------------------------------
     // 1. DATA-DRIVEN: CSV Generation
@@ -33,6 +54,9 @@ class PricingEngineTest {
         double result = engine.calculateDiscount(amount, tier);
         // allowing difference upto 0.01
         assertEquals(expected, result, 0.01);
+
+        // Mockito verify: ensure audit logging was invoked once per run
+        verify(auditService, times(1)).logCalculation(tier.name(), amount, expected);
     }
 
     // -------------------------------------------------------------
@@ -45,6 +69,9 @@ class PricingEngineTest {
         assertThrows(IllegalArgumentException.class, () -> 
             engine.calculateDiscount(invalidAmount, PricingEngine.CustomerTier.STANDARD)
         );
+
+        // Verification: ensure no audit log is sent when validation fails
+        verifyNoInteractions(auditService);
     }
 
     // Input provider to be set in method source annotation
@@ -66,8 +93,15 @@ class PricingEngineTest {
 
         return tiers.stream().map(tier -> 
             DynamicTest.dynamicTest("Test zero amount for tier " + tier, () -> {
-                double discounted = engine.calculateDiscount(0.0, tier);
+
+                AuditService localAudit = Mockito.mock(AuditService.class);
+                PricingEngine localEngine = new PricingEngine(localAudit);
+
+                double discounted = localEngine.calculateDiscount(0.0, tier);
+                
                 assertEquals(0.0, discounted, "Discount on zero must be zero");
+
+                verify(localAudit).logCalculation(tier.name(), 0.0, 0.0);
             })
         );
     }
@@ -81,9 +115,15 @@ class PricingEngineTest {
             @ForAll @Positive double amount, 
             @ForAll PricingEngine.CustomerTier tier) {
         
-        double discounted = engine.calculateDiscount(amount, tier);
+        // Use a no-op mock or standalone instance for fast property execution
+        AuditService noOpAudit = Mockito.mock(AuditService.class);
+        PricingEngine propertyEngine = new PricingEngine(noOpAudit);
+
+        double discounted = propertyEngine.calculateDiscount(amount, tier);
         
         // Assert invariants: final price must be <= original price
         assertThat(discounted).isLessThanOrEqualTo(amount);
+
+        verify(noOpAudit, atLeastOnce()).logCalculation(anyString(), anyDouble(), anyDouble());
     }
 }

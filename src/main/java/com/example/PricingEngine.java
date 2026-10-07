@@ -4,6 +4,18 @@ public class PricingEngine {
 
     public enum CustomerTier { STANDARD, SILVER, GOLD }
 
+    private final AuditService auditService;
+
+    // Default constructor for simple usage
+    public PricingEngine() {
+        this((tier, amount, result) -> {});
+    }
+
+    // Constructor with collaborator dependency
+    public PricingEngine(AuditService auditService) {
+        this.auditService = auditService;
+    }
+
     public double calculateDiscount(double amount, CustomerTier tier) {
         if (amount < 0) {
             throw new IllegalArgumentException("Amount cannot be negative");
@@ -18,6 +30,11 @@ public class PricingEngine {
             case GOLD     -> 0.20;
         };
 
-        return Math.round(amount * (1.0 - rate) * 100.0) / 100.0;
+        double result = Math.round(amount * (1.0 - rate) * 100.0) / 100.0;
+
+        // calling auditservice log function from priceEngine.
+        auditService.logCalculation(tier.name(), amount, result);
+  
+        return result;
     }
 }
