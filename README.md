@@ -8,6 +8,6 @@ Parameterized test using,
 3. DYNAMIC TEST FACTORY: Generated at Runtime -- with TestFactory annotation
 4. PROPERTY-BASED: Auto-generated inputs (jqwik engine) -- random inputs generated at configured number of times
 
-**Mockito**
+**Mockito** --
 Mockito is using to test the dependend class. 
 Never mock the class want to test using mockito, only the dependencies.
